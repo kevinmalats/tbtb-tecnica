@@ -1,109 +1,72 @@
-using System.Globalization;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Tbtb.Application.Abstractions;
-using Tbtb.Application.Validation;
+using Tbtb.Application.UseCases;
 using Tbtb.Infrastructure;
 using Tbtb.Infrastructure.Persistence;
 
-string[] Channels = ["LLAMADA", "WHATSAPP", "CORREO"];
-string[] ResultCodes = ["CONTACTADO", "SIN_RESPUESTA", "FALLIDO"];
-var b = WebApplication.CreateBuilder(args);
-b.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow);
-b.Services.AddSingleton<IClock, SystemClock>();
-b.Services.AddDbContext<TbtbDbContext>(o => o.UseSqlServer(b.Configuration.GetConnectionString("Tbtb")));
-b.Services.AddProblemDetails();
-b.Services.AddEndpointsApiExplorer(); b.Services.AddSwaggerGen(o =>
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow);
+builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddDbContext<TbtbDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Tbtb")));
+builder.Services.AddScoped<SqlTbtbUseCases>();
+builder.Services.AddScoped<IActorRepository>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<ICatalogRepository>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<IPatientRepository>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<IFollowUpRepository>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<IContactRepository>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<IMonthlyContactQuery>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<IHealthProbe>(sp => sp.GetRequiredService<SqlTbtbUseCases>());
+builder.Services.AddScoped<ITbtbUseCases, TbtbUseCases>();
+builder.Services.AddProblemDetails();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
 {
-    o.SwaggerDoc("v1", new() { Title = "TBTB Contactos API", Version = "v1" });
-    o.AddSecurityDefinition("DemoActor", new() { Type = SecuritySchemeType.ApiKey, In = ParameterLocation.Header, Name = "X-Demo-Actor-Id" });
-    o.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" } }] = []
-    });
+    options.SwaggerDoc("v1", new() { Title = "TBTB Contactos API", Version = "v1" });
+    options.AddSecurityDefinition("DemoActor", new() { Type = SecuritySchemeType.ApiKey, In = ParameterLocation.Header, Name = "X-Demo-Actor-Id" });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement { [new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" } }] = [] });
 });
-var app = b.Build(); app.UseExceptionHandler(); app.UseStatusCodePages(async c => { var h = c.HttpContext; if (h.Response.HasStarted) return; var status = h.Response.StatusCode; var code = status == 415 ? "UNSUPPORTED_MEDIA_TYPE" : status == 400 ? "VALIDATION_ERROR" : "HTTP_ERROR"; h.Response.ContentType = "application/problem+json"; await h.Response.WriteAsJsonAsync(new { type = "about:blank", title = status == 415 ? "El tipo de contenido no es compatible." : "La solicitud no es valida.", status, code, traceId = h.TraceIdentifier }); }); app.UseSwagger(); app.UseSwaggerUI();
+
+var app = builder.Build();
+app.UseExceptionHandler();
+app.UseStatusCodePages(async context =>
+{
+    var http = context.HttpContext; if (http.Response.HasStarted) return; var status = http.Response.StatusCode;
+    var code = status == 415 ? "UNSUPPORTED_MEDIA_TYPE" : status == 400 ? "VALIDATION_ERROR" : "HTTP_ERROR";
+    http.Response.ContentType = "application/problem+json";
+    await http.Response.WriteAsJsonAsync(new { type = "about:blank", title = status == 415 ? "El tipo de contenido no es compatible." : "La solicitud no es valida.", status, code, traceId = http.TraceIdentifier });
+});
+app.UseSwagger(); app.UseSwaggerUI();
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
-app.MapGet("/health/ready", Ready).AllowAnonymous();
-var api = app.MapGroup("/api/v1").AddEndpointFilter(async (c, n) =>
+app.MapGet("/health/ready", async (ITbtbUseCases cases, CancellationToken ct) => await cases.IsReady(ct) ? Results.Ok(new { status = "healthy" }) : Results.Json(new { status = "unhealthy", code = "DEPENDENCY_UNAVAILABLE" }, statusCode: 503)).AllowAnonymous();
+
+var api = app.MapGroup("/api/v1").AddEndpointFilter(async (context, next) =>
 {
-    var h = c.HttpContext; if (!Guid.TryParse(h.Request.Headers["X-Demo-Actor-Id"], out var id)) return Err(h, 401, "DEMO_ACTOR_REQUIRED", "Se requiere un actor valido.");
-    if (!h.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DemoAuthEnabled")) return Err(h, 401, "DEMO_AUTH_DISABLED", "El modo de actores de demostracion esta deshabilitado.");
-    var db = h.RequestServices.GetRequiredService<TbtbDbContext>(); var a = await db.Actors.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
-    if (a is null) return Err(h, 401, "DEMO_ACTOR_REQUIRED", "Se requiere un actor valido."); h.Items["actor"] = a; return await n(c);
+    var http = context.HttpContext;
+    if (!Guid.TryParse(http.Request.Headers["X-Demo-Actor-Id"], out var id)) return Problem(http, UseCaseResult.Fail(401, "DEMO_ACTOR_REQUIRED", "Se requiere un actor valido."));
+    if (!http.RequestServices.GetRequiredService<IConfiguration>().GetValue<bool>("DemoAuthEnabled")) return Problem(http, UseCaseResult.Fail(401, "DEMO_AUTH_DISABLED", "El modo de actores de demostracion esta deshabilitado."));
+    var actor = await http.RequestServices.GetRequiredService<ITbtbUseCases>().FindActor(id, http.RequestAborted);
+    if (actor is null) return Problem(http, UseCaseResult.Fail(401, "DEMO_ACTOR_REQUIRED", "Se requiere un actor valido."));
+    http.Items["actor"] = actor; return await next(context);
 });
-api.MapGet("/catalogs", async (TbtbDbContext db, HttpContext h) =>
-{
-    var a = Act(h); var mq = db.Actors.AsNoTracking().Where(x => x.Role == "GESTOR"); if (a.Role == "GESTOR") mq = mq.Where(x => x.Id == a.Id);
-    return Results.Ok(new { countries = await db.Countries.AsNoTracking().Select(x => new { x.Code, x.Name }).ToArrayAsync(), cities = await db.Cities.AsNoTracking().Select(x => new { x.Id, x.CountryCode, x.Name }).ToArrayAsync(), documentTypes = await db.DocumentTypes.AsNoTracking().Select(x => new { x.Code, x.Name }).ToArrayAsync(), channels = Opts(Channels), results = Opts(ResultCodes), managers = await mq.Select(x => new { x.Id, x.DisplayName }).ToArrayAsync() });
-});
-api.MapPost("/patients", async (PatientIn r, TbtbDbContext db, IClock clock, HttpContext h) =>
-{
-    var a = Act(h); if (a.Role != "GESTOR") return Err(h, 403, "FORBIDDEN", "Sin permiso."); var e = PatientErrors(r, clock.UtcNow);
-    if (!await db.Countries.AnyAsync(x => x.Code == r.DocumentCountryCode)) e["documentCountryCode"] = ["El pais no existe."];
-    if (!await db.DocumentTypes.AnyAsync(x => x.Code == r.DocumentTypeCode)) e["documentTypeCode"] = ["El tipo no existe."];
-    var city = await db.Cities.FindAsync(r.CityId); if (city is null) e["cityId"] = ["La ciudad no existe."]; if (e.Count > 0) return Validation(h, e);
-    var norm = r.DocumentNumber.Trim().ToUpperInvariant(); if (await db.Patients.AnyAsync(x => x.DocumentCountryCode == r.DocumentCountryCode && x.DocumentTypeCode == r.DocumentTypeCode && x.NormalizedDocumentNumber == norm)) return Err(h, 409, "PATIENT_ALREADY_EXISTS", "El paciente ya existe.");
-    var p = new Tbtb.Domain.Patient { Id = Guid.NewGuid(), FullName = r.FullName.Trim(), DocumentCountryCode = r.DocumentCountryCode, DocumentTypeCode = r.DocumentTypeCode, DocumentNumber = r.DocumentNumber.Trim(), NormalizedDocumentNumber = norm, Phone = r.Phone.Trim(), Email = string.IsNullOrWhiteSpace(r.Email) ? null : r.Email.Trim(), CityId = r.CityId, TreatmentStartDate = DateOnly.Parse(r.TreatmentStartDate), AssignedManagerId = a.Id, CreatedAtUtc = clock.UtcNow, CreatedBy = a.Id };
-    db.Patients.Add(p);
-    try { await db.SaveChangesAsync(); }
-    catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 }) { return Err(h, 409, "PATIENT_ALREADY_EXISTS", "El paciente ya existe."); }
-    return Results.Created($"/api/v1/patients/{p.Id}", PD(p, city!.Name));
-});
-api.MapGet("/patients", async (TbtbDbContext db, HttpContext h, int page = 1, int pageSize = 20) =>
-{
-    if (page < 1 || pageSize is < 1 or > 100) return Validation(h, new() { { "page", ["Paginacion invalida."] } }); var a = Act(h); var q = db.Patients.AsNoTracking().AsQueryable(); if (a.Role == "GESTOR") q = q.Where(x => x.AssignedManagerId == a.Id); var total = await q.CountAsync(); var rows = await q.Include(x => x.City).OrderBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(); return Results.Ok(new { items = rows.Select(x => PD(x, x.City!.Name)), total, page, pageSize });
-});
-api.MapGet("/patients/{id:guid}", async (Guid id, TbtbDbContext db, HttpContext h) => { var a = Act(h); var p = await db.Patients.Include(x => x.City).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && (a.Role == "COORDINADORA" || x.AssignedManagerId == a.Id)); return p is null ? Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado.") : Results.Ok(PD(p, p.City!.Name)); });
-api.MapPost("/follow-ups", async (FollowIn r, TbtbDbContext db, IClock clock, HttpContext h) => { var a = Act(h); if (a.Role != "GESTOR") return Err(h, 403, "FORBIDDEN", "Sin permiso."); var e = new Dictionary<string, string[]>(); if (!Guid.TryParse(r.PatientId, out var pid)) e["patientId"] = ["El paciente no es valido."]; if (!TryInstant(r.ScheduledAt, out var at) || at.UtcDateTime <= clock.UtcNow) e["scheduledAt"] = ["La fecha debe incluir offset y ser futura."]; if (e.Count > 0) return Validation(h, e); if (!await db.Patients.AnyAsync(x => x.Id == pid && x.AssignedManagerId == a.Id)) return Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado."); var f = new Tbtb.Domain.FollowUp { Id = Guid.NewGuid(), PatientId = pid, ManagerId = a.Id, ScheduledAtUtc = at.UtcDateTime, CreatedAtUtc = clock.UtcNow, CreatedBy = a.Id }; db.FollowUps.Add(f); await db.SaveChangesAsync(); return Results.Created($"/api/v1/follow-ups/{f.Id}", FD(f)); });
-api.MapGet("/follow-ups", async (string patientId, TbtbDbContext db, HttpContext h) => { if (!Guid.TryParse(patientId, out var id)) return Validation(h, new() { { "patientId", ["Paciente invalido."] } }); var a = Act(h); if (!await db.Patients.AnyAsync(x => x.Id == id && (a.Role == "COORDINADORA" || x.AssignedManagerId == a.Id))) return Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado."); var x = await db.FollowUps.AsNoTracking().Where(x => x.PatientId == id).OrderBy(x => x.ScheduledAtUtc).ToArrayAsync(); return Results.Ok(x.Select(FD)); });
-api.MapPost("/contacts", async (ContactIn r, TbtbDbContext db, IClock clock, HttpContext h) => { var a = Act(h); if (a.Role != "GESTOR") return Err(h, 403, "FORBIDDEN", "Sin permiso."); var e = new Dictionary<string, string[]>(); if (!Guid.TryParse(r.PatientId, out var pid)) e["patientId"] = ["El paciente no es valido."]; if (!ValidChoice(r.Channel, Channels)) e["channel"] = ["El canal no es valido."]; if (!ValidChoice(r.Result, ResultCodes)) e["result"] = ["El resultado no es valido."]; if (!TryInstant(r.OccurredAt, out var at) || at.UtcDateTime > clock.UtcNow) e["occurredAt"] = ["La fecha debe incluir offset y no puede ser futura."]; if (e.Count > 0) return Validation(h, e); var p = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == pid && x.AssignedManagerId == a.Id); if (p is null) return Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado."); var c = new Tbtb.Domain.Contact { Id = Guid.NewGuid(), PatientId = p.Id, ManagerId = a.Id, CityAtContactId = p.CityId, CurrentRevision = 1, CreatedAtUtc = clock.UtcNow, CreatedBy = a.Id }; c.Revisions.Add(new() { ContactId = c.Id, RevisionNumber = 1, OccurredAtUtc = at.UtcDateTime, Channel = r.Channel, Result = r.Result, RecordedAtUtc = clock.UtcNow, RecordedBy = a.Id }); db.Add(c); await db.SaveChangesAsync(); return Results.Created($"/api/v1/contacts/{c.Id}", await ContactDto(db, c.Id)); });
-api.MapGet("/contacts", async (TbtbDbContext db, IClock clock, HttpContext h, string? month = null, string? managerId = null, int? cityId = null, int page = 1, int pageSize = 20) => { var a = Act(h); var e = new Dictionary<string, string[]>(); var m = month ?? TimeZoneInfo.ConvertTimeBySystemTimeZoneId(clock.UtcNow, "SA Pacific Standard Time").ToString("yyyy-MM"); var localStart = DateTime.MinValue; if (!Regex.IsMatch(m, @"^\d{4}-(0[1-9]|1[0-2])$") || !DateTime.TryParseExact(m + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out localStart) || localStart.Year is < 1 or > 9998) e["month"] = ["Mes invalido."]; if (page < 1) e["page"] = ["La pagina debe iniciar en 1."]; if (pageSize is < 1 or > 100) e["pageSize"] = ["El tamano de pagina debe estar entre 1 y 100."]; Guid? mid = null; if (managerId is not null) { if (!Guid.TryParse(managerId, out var parsed) || !await db.Actors.AnyAsync(x => x.Id == parsed && x.Role == "GESTOR")) e["managerId"] = ["El gestor no existe."]; else mid = parsed; } if (cityId.HasValue && !await db.Cities.AnyAsync(x => x.Id == cityId)) e["cityId"] = ["La ciudad no existe."]; if (e.Count > 0) return Validation(h, e); if (a.Role == "GESTOR" && mid.HasValue && mid != a.Id) return Err(h, 403, "FORBIDDEN", "Sin permiso."); var start = localStart.AddHours(5); var end = localStart.AddMonths(1).AddHours(5); var q = db.Contacts.AsNoTracking().Include(x => x.Patient).Include(x => x.Manager).Include(x => x.CityAtContact).Include(x => x.Revisions).Where(x => x.Revisions.Any(r => r.RevisionNumber == x.CurrentRevision && r.OccurredAtUtc >= start && r.OccurredAtUtc < end)); var effective = a.Role == "GESTOR" ? a.Id : mid; if (effective.HasValue) q = q.Where(x => x.ManagerId == effective); if (cityId.HasValue) q = q.Where(x => x.CityAtContactId == cityId); var total = await q.CountAsync(); var rows = await q.ToArrayAsync(); var ordered = rows.OrderByDescending(x => x.Revisions.Single(r => r.RevisionNumber == x.CurrentRevision).OccurredAtUtc).ThenByDescending(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize); return Results.Ok(new { items = ordered.Select(CD), total, page, pageSize, month = m, timeZone = "America/Bogota" }); });
-api.MapGet("/contacts/{id:guid}", async (Guid id, TbtbDbContext db, HttpContext h) => { var c = await CQ(db, id, Act(h)); return c is null ? Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado.") : Results.Ok(CD(c)); });
-api.MapPost("/contacts/{id:guid}/corrections", async (Guid id, CorrectionIn r, TbtbDbContext db, IClock clock, HttpContext h) => { var a = Act(h); if (a.Role != "GESTOR") return Err(h, 403, "FORBIDDEN", "Sin permiso."); var c = await db.Contacts.Include(x => x.Patient).Include(x => x.Manager).Include(x => x.CityAtContact).Include(x => x.Revisions).SingleOrDefaultAsync(x => x.Id == id && x.ManagerId == a.Id); if (c is null) return Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado."); var e = new Dictionary<string, string[]>(); if (string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Trim().Length is < 10 or > 500) e["reason"] = ["El motivo debe tener entre 10 y 500 caracteres."]; if (!TryInstant(r.OccurredAt, out var at) || at.UtcDateTime > clock.UtcNow) e["occurredAt"] = ["La fecha debe incluir offset y no puede ser futura."]; if (!ValidChoice(r.Channel, Channels)) e["channel"] = ["El canal no es valido."]; if (!ValidChoice(r.Result, ResultCodes)) e["result"] = ["El resultado no es valido."]; if (!TryVersion(r.ExpectedVersion, out var version)) e["expectedVersion"] = ["La version esperada no es valida."]; if (e.Count > 0) return Validation(h, e); db.Entry(c).Property(x => x.RowVersion).OriginalValue = version; var current = c.Revisions.Single(x => x.RevisionNumber == c.CurrentRevision); if (!c.RowVersion.SequenceEqual(version)) { return Err(h, 409, "CONTACT_VERSION_CONFLICT", "Version desactualizada."); } if (current.OccurredAtUtc == at.UtcDateTime && current.Channel == r.Channel && current.Result == r.Result) return Err(h, 400, "NO_CHANGES", "La correccion no modifica el contacto."); c.CurrentRevision++; c.Revisions.Add(new() { ContactId = id, RevisionNumber = c.CurrentRevision, OccurredAtUtc = at.UtcDateTime, Channel = r.Channel, Result = r.Result, CorrectionReason = r.Reason.Trim(), RecordedAtUtc = clock.UtcNow, RecordedBy = a.Id }); try { await db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { return Err(h, 409, "CONTACT_VERSION_CONFLICT", "Version desactualizada."); } return Results.Ok(CD(c)); });
-api.MapGet("/contacts/{id:guid}/history", async (Guid id, TbtbDbContext db, HttpContext h) => { var a = Act(h); if (!await db.Contacts.AnyAsync(x => x.Id == id && (a.Role == "COORDINADORA" || x.ManagerId == a.Id))) return Err(h, 404, "RESOURCE_NOT_FOUND", "No encontrado."); var x = await db.ContactRevisions.Include(r => r.RecordedByActor).AsNoTracking().Where(r => r.ContactId == id).OrderBy(r => r.RevisionNumber).ToArrayAsync(); return Results.Ok(x.Select(r => new { contactId = id, revision = r.RevisionNumber, occurredAt = Iso(r.OccurredAtUtc), r.Channel, r.Result, reason = r.CorrectionReason, recordedAt = Iso(r.RecordedAtUtc), r.RecordedBy, recordedByName = r.RecordedByActor!.DisplayName })); });
+
+api.MapGet("/catalogs", async (ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.GetCatalogs(Actor(http), ct)));
+api.MapPost("/patients", async (PatientCommand command, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.CreatePatient(Actor(http), command, ct)));
+api.MapGet("/patients", async (ITbtbUseCases cases, HttpContext http, int page = 1, int pageSize = 20, CancellationToken ct = default) => ToHttp(http, await cases.GetPatients(Actor(http), page, pageSize, ct)));
+api.MapGet("/patients/{id:guid}", async (Guid id, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.GetPatient(Actor(http), id, ct)));
+api.MapPost("/follow-ups", async (FollowUpCommand command, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.CreateFollowUp(Actor(http), command, ct)));
+api.MapGet("/follow-ups", async (string patientId, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.GetFollowUps(Actor(http), patientId, ct)));
+api.MapPost("/contacts", async (ContactCommand command, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.CreateContact(Actor(http), command, ct)));
+api.MapGet("/contacts", async (ITbtbUseCases cases, HttpContext http, string? month = null, string? managerId = null, int? cityId = null, int page = 1, int pageSize = 20, CancellationToken ct = default) => ToHttp(http, await cases.GetContacts(Actor(http), month, managerId, cityId, page, pageSize, ct)));
+api.MapGet("/contacts/{id:guid}", async (Guid id, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.GetContact(Actor(http), id, ct)));
+api.MapPost("/contacts/{id:guid}/corrections", async (Guid id, CorrectionCommand command, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.CorrectContact(Actor(http), id, command, ct)));
+api.MapGet("/contacts/{id:guid}/history", async (Guid id, ITbtbUseCases cases, HttpContext http, CancellationToken ct) => ToHttp(http, await cases.GetContactHistory(Actor(http), id, ct)));
+
 app.Run();
-static async Task<IResult> Ready(TbtbDbContext db)
-{
-    try
-    {
-        return await db.Database.CanConnectAsync() && await db.Actors.AsNoTracking().AnyAsync()
-            ? Results.Ok(new { status = "healthy" })
-            : Results.Json(new { status = "unhealthy", code = "DEPENDENCY_UNAVAILABLE" }, statusCode: 503);
-    }
-    catch
-    {
-        return Results.Json(new { status = "unhealthy", code = "DEPENDENCY_UNAVAILABLE" }, statusCode: 503);
-    }
-}
-static Tbtb.Domain.Actor Act(HttpContext h) => (Tbtb.Domain.Actor)h.Items["actor"]!; static bool ValidChoice(string x, string[] xs) => xs.Contains(x);
-static bool TryInstant(string value, out DateTimeOffset parsed) => ContactRules.TryInstant(value, out parsed);
-static bool TryVersion(string value, out byte[] bytes) => ContactRules.TryVersion(value, out bytes);
-static object[] Opts(string[] xs) => xs.Select(x => (object)new { code = x, name = x.Replace("_", " ") }).ToArray();
-static string Iso(DateTime x) => x.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
-static object PD(Tbtb.Domain.Patient x, string city) => new { x.Id, x.FullName, x.DocumentCountryCode, x.DocumentTypeCode, x.DocumentNumber, x.Phone, x.Email, x.CityId, cityName = city, treatmentStartDate = x.TreatmentStartDate.ToString("yyyy-MM-dd"), x.AssignedManagerId };
-static object FD(Tbtb.Domain.FollowUp x) => new { x.Id, x.PatientId, x.ManagerId, scheduledAt = Iso(x.ScheduledAtUtc) };
-static object CD(Tbtb.Domain.Contact c) { var r = c.Revisions.Single(x => x.RevisionNumber == c.CurrentRevision); return new { c.Id, c.PatientId, patientName = c.Patient!.FullName, c.ManagerId, managerName = c.Manager!.DisplayName, cityId = c.CityAtContactId, cityName = c.CityAtContact!.Name, occurredAt = Iso(r.OccurredAtUtc), r.Channel, r.Result, revision = c.CurrentRevision, version = Convert.ToBase64String(c.RowVersion) }; }
-static async Task<Tbtb.Domain.Contact?> CQ(TbtbDbContext db, Guid id, Tbtb.Domain.Actor a) => await db.Contacts.AsNoTracking().Include(x => x.Patient).Include(x => x.Manager).Include(x => x.CityAtContact).Include(x => x.Revisions).SingleOrDefaultAsync(x => x.Id == id && (a.Role == "COORDINADORA" || x.ManagerId == a.Id));
-static async Task<object?> ContactDto(TbtbDbContext db, Guid id) { var c = await db.Contacts.AsNoTracking().Include(x => x.Patient).Include(x => x.Manager).Include(x => x.CityAtContact).Include(x => x.Revisions).SingleAsync(x => x.Id == id); return CD(c); }
-static Dictionary<string, string[]> PatientErrors(PatientIn r, DateTime utcNow)
-{
-    var e = new Dictionary<string, string[]>();
-    if (string.IsNullOrWhiteSpace(r.FullName) || r.FullName.Trim().Length > 150) e["fullName"] = ["El nombre es obligatorio y no debe superar 150 caracteres."];
-    if (string.IsNullOrWhiteSpace(r.DocumentNumber) || r.DocumentNumber.Trim().Length > 40) e["documentNumber"] = ["El documento es obligatorio y no debe superar 40 caracteres."];
-    var phone = r.Phone?.Trim() ?? "";
-    if (phone.Length is < 7 or > 30 || !Regex.IsMatch(phone, @"^(?=(?:\D*\d){7})[0-9 +()\-]+$")) e["phone"] = ["El telefono debe tener entre 7 y 30 caracteres y al menos siete digitos."];
-    var email = r.Email?.Trim();
-    if (!string.IsNullOrEmpty(email) && (email.Length > 254 || !Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))) e["email"] = ["El correo no es valido."];
-    if (!DateOnly.TryParseExact(r.TreatmentStartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)) e["treatmentStartDate"] = ["La fecha no es valida."];
-    else if (start > DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(utcNow, "SA Pacific Standard Time"))) e["treatmentStartDate"] = ["La fecha de inicio no puede ser futura."];
-    return e;
-}
-static IResult Validation(HttpContext h, Dictionary<string, string[]> e) => Results.Json(new { type = "about:blank", title = "La solicitud contiene datos invalidos.", status = 400, code = "VALIDATION_ERROR", traceId = h.TraceIdentifier, errors = e }, statusCode: 400, contentType: "application/problem+json");
-static IResult Err(HttpContext h, int s, string c, string t) => Results.Json(new { type = "about:blank", title = t, status = s, code = c, traceId = h.TraceIdentifier }, statusCode: s, contentType: "application/problem+json");
-record PatientIn(string FullName, string DocumentCountryCode, string DocumentTypeCode, string DocumentNumber, string Phone, string? Email, int CityId, string TreatmentStartDate);
-record FollowIn(string PatientId, string ScheduledAt); record ContactIn(string PatientId, string OccurredAt, string Channel, string Result); record CorrectionIn(string OccurredAt, string Channel, string Result, string Reason, string ExpectedVersion);
+
+static ActorContext Actor(HttpContext http) => (ActorContext)http.Items["actor"]!;
+static IResult ToHttp(HttpContext http, UseCaseResult result) => result.Status switch { 200 => Results.Ok(result.Value), 201 => Results.Created(result.Location!, result.Value), _ => Problem(http, result) };
+static IResult Problem(HttpContext http, UseCaseResult result) => Results.Json(new { type = "about:blank", title = result.Title, status = result.Status, code = result.Code, traceId = http.TraceIdentifier, errors = result.Errors }, statusCode: result.Status, contentType: "application/problem+json");
+
 public partial class Program;
