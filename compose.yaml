@@ -26,6 +26,9 @@ services:
     environment:
       MSSQL_SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD in .env}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD in .env}
+      DEMO_REFERENCE_UTC: ${DEMO_REFERENCE_UTC:-2026-09-24T15:00:00Z}
+      LOAD_DEMO_CONTACTS: "true"
+      LOAD_TEST_SEED: "false"
     volumes:
       - ./scripts:/scripts:ro
       - ./docker/sqlserver/init.sh:/init.sh:ro

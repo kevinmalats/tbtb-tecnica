@@ -1,9 +1,45 @@
+name: tbtb-test
+
 services:
   db:
     ports: !reset []
+  db-init:
+    environment:
+      LOAD_DEMO_CONTACTS: "false"
+      LOAD_TEST_SEED: "true"
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Test
     ports: !reset []
   web:
     ports: !reset []
+  tests:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    entrypoint: ["/bin/bash", "/tests/acceptance-compose.sh"]
+    environment:
+      API_URL: http://api:8080
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
+  e2e:
+    build:
+      context: .
+      dockerfile: web/Dockerfile.e2e
+    environment:
+      WEB_URL: http://web
+      API_URL: http://api:8080
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  sqlserver-data:
+    name: tbtb-test-sqlserver-data
