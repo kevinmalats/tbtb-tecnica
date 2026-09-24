@@ -32,7 +32,10 @@ services:
     volumes:
       - ./scripts:/scripts:ro
       - ./docker/sqlserver/init.sh:/init.sh:ro
-    entrypoint: ["/bin/bash", "/init.sh"]
+    entrypoint:
+      - /bin/bash
+      - -c
+      - sed 's/\r$$//' /init.sh > /tmp/init.sh && exec /bin/bash /tmp/init.sh
     depends_on:
       db:
         condition: service_healthy

@@ -241,3 +241,10 @@
 - Tras dividir los puertos backend se reconstruyo la imagen final, se recreo el stack de desarrollo y se repitieron las 11 comprobaciones smoke, el fixture C1-C8 y Playwright sin regresiones.
 - Contenedores de desarrollo `db`, `api` y `web` saludables; Swagger permanece en `http://localhost:8080/swagger` y Angular en `http://localhost:4201` para este entorno.
 - Riesgo de tooling actualizado: `npm audit` informa 24 vulnerabilidades transitivas (2 bajas, 9 moderadas, 12 altas y 1 critica). No se aplico `npm audit fix --force` por introducir cambios mayores no evaluados.
+
+## 2026-09-24 - Portabilidad de db-init en Windows
+
+- Diagnosticado un `db-init` con codigo 2 en otra maquina Windows como compatible con conversion CRLF del script Bash durante checkout o copia del proyecto.
+- Agregado `.gitattributes` para fijar LF en scripts shell, SQL, Dockerfiles y manifiestos Compose.
+- Compose normaliza defensivamente `/init.sh` a `/tmp/init.sh` antes de ejecutarlo; esto cubre tambien entregas por ZIP que no respeten atributos Git.
+- El inicializador valida las dos contrasenas requeridas y ahora informa la linea de fallo junto con el comando para consultar sus logs.

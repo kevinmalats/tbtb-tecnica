@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+trap 'echo "SQL Server initialization failed at line ${LINENO}. Review: docker compose logs db-init" >&2' ERR
+
+: "${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required}"
+: "${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
 
 SQLCMD="/opt/mssql-tools18/bin/sqlcmd"
 if [[ ! -x "${SQLCMD}" ]]; then
