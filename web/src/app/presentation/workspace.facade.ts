@@ -1,6 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable } from '@angular/core';
 import {
-  ApiService,
   Catalogs,
   ContactPage,
   ContactRevision,
@@ -9,8 +8,10 @@ import {
   CreateFollowUp,
   CreatePatient,
   FollowUp,
-  Page
-} from '../core/api.service';
+  Page,
+  WorkspacePort,
+  WORKSPACE_PORT
+} from '../application/workspace.port';
 import { Contact } from '../features/contacts/domain/contact';
 import { Patient } from '../features/patients/domain/patient';
 
@@ -18,7 +19,7 @@ export type { Catalogs, ContactRevision, CreateContact, CreateFollowUp, CreatePa
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceFacade {
-  constructor(private readonly api: ApiService) {}
+  constructor(@Inject(WORKSPACE_PORT) private readonly api: WorkspacePort) {}
 
   setActor(id: string): void { this.api.setActor(id); }
   getCatalogs(): Promise<Catalogs> { return this.api.getCatalogs(); }

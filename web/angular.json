@@ -37,6 +37,15 @@
             "development": { "buildTarget": "tbtb-web:build:development" }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "runner": "vitest",
+            "buildTarget": "tbtb-web:build:development",
+            "tsConfig": "tsconfig.spec.json",
+            "watch": false
+          }
         }
       }
     }

@@ -3,6 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Routes } from '@angular/router';
 import { WorkspaceComponent } from './app/app.component';
 import { RootComponent } from './app/root.component';
+import { WORKSPACE_PORT } from './app/application/workspace.port';
+import { ApiService } from './app/core/api.service';
 
 const routes: Routes = [
   { path: '', component: WorkspaceComponent },
@@ -16,5 +18,5 @@ const routes: Routes = [
 ];
 
 bootstrapApplication(RootComponent, {
-  providers: [provideHttpClient(), provideRouter(routes)]
+  providers: [provideHttpClient(), provideRouter(routes), { provide: WORKSPACE_PORT, useExisting: ApiService }]
 }).catch((error: unknown) => console.error(error));
