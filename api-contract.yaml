@@ -1,0 +1,1472 @@
+# Contrato de diseño; todavía no implementado.
+"openapi": "3.0.3"
+"info":
+  "title": "TBTB - Contactos de pacientes"
+  "version": "0.1.0"
+  "description": "Contrato previo a implementación, derivado de 02-plan.md. CA-1, CA-2 y CA-4 previstos completos; CA-3 parcial; CA-5/CA-6 excluidos. No hay reporte de adherencia. Todos los ejemplos usan datos ficticios y reloj 2026-09-24T15:00:00Z. Fechas con offset y máximo tres decimales. Campos desconocidos en cuerpos se rechazan. Las reglas de negocio no expresables en JSON Schema se verifican en el servicio. Identity de demostración exclusiva del entorno local; no es autenticación productiva."
+"externalDocs":
+  "description": "Especificación OpenAPI utilizada"
+  "url": "https://spec.openapis.org/oas/v3.0.3.html"
+"servers":
+  -
+    "url": "http://localhost:4200"
+    "description": "Origen local previsto; /api se redirige a API y /health es para acceso interno o proxy explícito. No implica servidor ya disponible."
+"security":
+  -
+    "DemoActor": []
+"tags":
+  -
+    "name": "Catálogos"
+  -
+    "name": "Pacientes"
+  -
+    "name": "Agenda"
+  -
+    "name": "Contactos"
+  -
+    "name": "Salud"
+"paths":
+  "/api/v1/catalogs":
+    "get":
+      "operationId": "getCatalogs"
+      "summary": "Consultar catálogos"
+      "description": "Gestor recibe solo su entrada en managers; coordinadora recibe todos. Los demás catálogos son comunes. El selector inicial de actor se configura localmente; este endpoint requiere actor."
+      "tags":
+        - "Catálogos"
+      "x-acceptance-scenarios":
+        - "SEC-01"
+        - "CAT-01"
+      "x-acceptance-criteria": []
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Catalogs"
+              "example":
+                "countries":
+                  -
+                    "code": "CO"
+                    "name": "Colombia"
+                  -
+                    "code": "PE"
+                    "name": "Perú"
+                  -
+                    "code": "EC"
+                    "name": "Ecuador"
+                "cities":
+                  -
+                    "id": 1
+                    "countryCode": "CO"
+                    "name": "Bogotá"
+                  -
+                    "id": 2
+                    "countryCode": "PE"
+                    "name": "Lima"
+                "documentTypes":
+                  -
+                    "code": "NATIONAL_ID"
+                    "name": "NATIONAL_ID"
+                  -
+                    "code": "FOREIGN_ID"
+                    "name": "FOREIGN_ID"
+                  -
+                    "code": "PASSPORT"
+                    "name": "PASSPORT"
+                "channels":
+                  -
+                    "code": "LLAMADA"
+                    "name": "LLAMADA"
+                  -
+                    "code": "WHATSAPP"
+                    "name": "WHATSAPP"
+                  -
+                    "code": "CORREO"
+                    "name": "CORREO"
+                "results":
+                  -
+                    "code": "CONTACTADO"
+                    "name": "CONTACTADO"
+                  -
+                    "code": "SIN_RESPUESTA"
+                    "name": "SIN_RESPUESTA"
+                  -
+                    "code": "FALLIDO"
+                    "name": "FALLIDO"
+                "managers":
+                  -
+                    "id": "11111111-1111-4111-8111-111111111111"
+                    "displayName": "Gestor A"
+                  -
+                    "id": "22222222-2222-4222-8222-222222222222"
+                    "displayName": "Gestor B"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+  "/api/v1/patients":
+    "post":
+      "operationId": "registerPatient"
+      "summary": "Registrar paciente"
+      "description": "Solo GESTOR. assignedManagerId y CreatedBy se resuelven desde el actor. Email vacío se devuelve null. Unicidad global de identidad; la respuesta de duplicado no revela datos del paciente existente."
+      "tags":
+        - "Pacientes"
+      "x-acceptance-scenarios":
+        - "CA01-01"
+        - "CA01-02"
+        - "CA01-03"
+        - "CA01-04"
+        - "SEC-02"
+      "x-acceptance-criteria":
+        - "CA-1"
+      "responses":
+        "201":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Patient"
+              "example":
+                "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "fullName": "Paciente de prueba A"
+                "documentCountryCode": "CO"
+                "documentTypeCode": "NATIONAL_ID"
+                "documentNumber": "001234"
+                "phone": "+57 300 000 0000"
+                "email": null
+                "cityId": 1
+                "treatmentStartDate": "2026-08-01"
+                "cityName": "Bogotá"
+                "assignedManagerId": "11111111-1111-4111-8111-111111111111"
+          "headers":
+            "Location":
+              "schema":
+                "type": "string"
+                "format": "uri-reference"
+              "example": "/api/v1/patients/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+              "description": "Ruta del paciente creado."
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+        "415":
+          "$ref": "#/components/responses/UnsupportedMediaType"
+        "409":
+          "description": "Ya existe un paciente con esa identidad."
+          "content":
+            "application/problem+json":
+              "schema":
+                "$ref": "#/components/schemas/Problem"
+              "example":
+                "type": "about:blank"
+                "title": "Ya existe un paciente con esa identidad."
+                "status": 409
+                "code": "PATIENT_ALREADY_EXISTS"
+                "traceId": "demo-trace-0001"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CreatePatientRequest"
+            "example":
+              "fullName": "Paciente de prueba A"
+              "documentCountryCode": "CO"
+              "documentTypeCode": "NATIONAL_ID"
+              "documentNumber": "001234"
+              "phone": "+57 300 000 0000"
+              "email": null
+              "cityId": 1
+              "treatmentStartDate": "2026-08-01"
+    "get":
+      "operationId": "listPatients"
+      "summary": "Listar pacientes visibles"
+      "description": "Gestor: solo asignados. Coordinadora: todos. Orden id ascendente según SQL Server uniqueidentifier, sin garantía de orden lexicográfico textual. Página fuera de resultados: items vacío y total sin cambiar."
+      "tags":
+        - "Pacientes"
+      "x-acceptance-scenarios":
+        - "CA01-01"
+        - "SEC-03"
+        - "HTTP-01"
+      "x-acceptance-criteria":
+        - "CA-1"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PatientPage"
+              "example":
+                "items":
+                  -
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                    "fullName": "Paciente de prueba A"
+                    "documentCountryCode": "CO"
+                    "documentTypeCode": "NATIONAL_ID"
+                    "documentNumber": "001234"
+                    "phone": "+57 300 000 0000"
+                    "email": null
+                    "cityId": 1
+                    "treatmentStartDate": "2026-08-01"
+                    "cityName": "Bogotá"
+                    "assignedManagerId": "11111111-1111-4111-8111-111111111111"
+                "total": 1
+                "page": 1
+                "pageSize": 20
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "page"
+          "in": "query"
+          "required": false
+          "description": "Página comenzando en 1."
+          "schema":
+            "type": "integer"
+            "minimum": 1
+            "default": 1
+        -
+          "name": "pageSize"
+          "in": "query"
+          "required": false
+          "description": "Tamaño; no truncar valores inválidos."
+          "schema":
+            "type": "integer"
+            "minimum": 1
+            "maximum": 100
+            "default": 20
+  "/api/v1/patients/{id}":
+    "get":
+      "operationId": "getPatient"
+      "summary": "Consultar paciente"
+      "description": "Recurso inexistente y no visible producen la misma respuesta 404."
+      "tags":
+        - "Pacientes"
+      "x-acceptance-scenarios":
+        - "CA01-01"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-1"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Patient"
+              "example":
+                "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "fullName": "Paciente de prueba A"
+                "documentCountryCode": "CO"
+                "documentTypeCode": "NATIONAL_ID"
+                "documentNumber": "001234"
+                "phone": "+57 300 000 0000"
+                "email": null
+                "cityId": 1
+                "treatmentStartDate": "2026-08-01"
+                "cityName": "Bogotá"
+                "assignedManagerId": "11111111-1111-4111-8111-111111111111"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "description": "UUID del recurso; mal formado: 400."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+  "/api/v1/follow-ups":
+    "post":
+      "operationId": "scheduleFollowUp"
+      "summary": "Agendar seguimiento manual"
+      "description": "Solo gestor asignado. Sin cumplimiento automático, recordatorios ni enlace obligatorio a un contacto. Se admiten dos seguimientos a la misma hora; no se ha definido exclusión de agenda."
+      "tags":
+        - "Agenda"
+      "x-acceptance-scenarios":
+        - "CA01-01"
+        - "CA01-05"
+        - "SEC-02"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-1"
+      "responses":
+        "201":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/FollowUp"
+              "example":
+                "id": "dddddddd-dddd-4ddd-8ddd-ddddddddddd1"
+                "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "managerId": "11111111-1111-4111-8111-111111111111"
+                "scheduledAt": "2026-09-25T15:00:00Z"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+        "415":
+          "$ref": "#/components/responses/UnsupportedMediaType"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CreateFollowUpRequest"
+            "example":
+              "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+              "scheduledAt": "2026-09-25T15:00:00Z"
+    "get":
+      "operationId": "listFollowUps"
+      "summary": "Listar agenda de un paciente"
+      "description": "Orden scheduledAt ascendente y después id ascendente según SQL Server; lista vacía si no hay seguimientos."
+      "tags":
+        - "Agenda"
+      "x-acceptance-scenarios":
+        - "CA01-01"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-1"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/FollowUp"
+              "example":
+                -
+                  "id": "dddddddd-dddd-4ddd-8ddd-ddddddddddd1"
+                  "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                  "managerId": "11111111-1111-4111-8111-111111111111"
+                  "scheduledAt": "2026-09-25T15:00:00Z"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "patientId"
+          "in": "query"
+          "required": true
+          "description": "Paciente visible requerido."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+  "/api/v1/contacts":
+    "post":
+      "operationId": "registerContact"
+      "summary": "Registrar contacto realizado"
+      "description": "Solo gestor asignado. Crea contacto y revisión 1 en una transacción. Ciudad copiada del paciente y gestor del contexto. No reintentar automáticamente POST: el contrato no garantiza idempotencia."
+      "tags":
+        - "Contactos"
+      "x-acceptance-scenarios":
+        - "CA02-01"
+        - "CA02-02"
+        - "CA02-03"
+        - "CA02-04"
+        - "SEC-02"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-2"
+      "responses":
+        "201":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Contact"
+              "example":
+                "id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+                "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "patientName": "Paciente de prueba A"
+                "managerId": "11111111-1111-4111-8111-111111111111"
+                "managerName": "Gestor A"
+                "cityId": 1
+                "cityName": "Bogotá"
+                "occurredAt": "2026-09-10T15:00:00Z"
+                "channel": "LLAMADA"
+                "result": "SIN_RESPUESTA"
+                "revision": 1
+                "version": "AAAAAAAAAAE="
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+        "415":
+          "$ref": "#/components/responses/UnsupportedMediaType"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CreateContactRequest"
+            "example":
+              "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+              "occurredAt": "2026-09-10T15:00:00Z"
+              "channel": "LLAMADA"
+              "result": "SIN_RESPUESTA"
+    "get":
+      "operationId": "listMonthlyContacts"
+      "summary": "Consultar contactos del mes"
+      "description": "Solo revisión vigente. Intersección de filtros. Intervalo mensual [inicio, inicio siguiente mes), convertido a UTC. Gestor siempre restringido a sus contactos. Orden occurredAt DESC, id DESC según SQL Server uniqueidentifier. total refleja filtros y permisos. Sin garantía de snapshot entre solicitudes concurrentes. Mes sin filas o página fuera de resultados devuelve 200 con items vacío."
+      "tags":
+        - "Contactos"
+      "x-acceptance-scenarios":
+        - "CA04-01"
+        - "CA04-02"
+        - "CA04-03"
+        - "CA04-04"
+        - "CA04-05"
+        - "CA03-03"
+        - "SEC-04"
+        - "HTTP-01"
+      "x-acceptance-criteria":
+        - "CA-4"
+        - "CA-3 (parcial)"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ContactPage"
+              "example":
+                "items":
+                  -
+                    "id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+                    "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                    "patientName": "Paciente de prueba A"
+                    "managerId": "11111111-1111-4111-8111-111111111111"
+                    "managerName": "Gestor A"
+                    "cityId": 1
+                    "cityName": "Bogotá"
+                    "occurredAt": "2026-09-10T15:00:00Z"
+                    "channel": "LLAMADA"
+                    "result": "SIN_RESPUESTA"
+                    "revision": 1
+                    "version": "AAAAAAAAAAE="
+                "total": 1
+                "page": 1
+                "pageSize": 20
+                "month": "2026-09"
+                "timeZone": "America/Bogota"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "month"
+          "in": "query"
+          "required": false
+          "description": "Omitido: mes actual en Bogotá; vacío es inválido."
+          "schema":
+            "type": "string"
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+            "description": "Mes civil de America/Bogota; años admitidos 0001 a 9998 para poder calcular el inicio del mes siguiente."
+        -
+          "name": "managerId"
+          "in": "query"
+          "required": false
+          "description": "Otro gestor existente: 403 para gestor; desconocido: 400."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+        -
+          "name": "cityId"
+          "in": "query"
+          "required": false
+          "description": "Ciudad de catálogo; desconocida: 400."
+          "schema":
+            "type": "integer"
+            "minimum": 1
+        -
+          "name": "page"
+          "in": "query"
+          "required": false
+          "description": "Página comenzando en 1."
+          "schema":
+            "type": "integer"
+            "minimum": 1
+            "default": 1
+        -
+          "name": "pageSize"
+          "in": "query"
+          "required": false
+          "description": "Tamaño; no truncar valores inválidos."
+          "schema":
+            "type": "integer"
+            "minimum": 1
+            "maximum": 100
+            "default": 20
+  "/api/v1/contacts/{id}":
+    "get":
+      "operationId": "getContact"
+      "summary": "Consultar revisión vigente"
+      "description": "Gestor ejecutor o coordinadora. Incluye versión para corrección."
+      "tags":
+        - "Contactos"
+      "x-acceptance-scenarios":
+        - "CA02-01"
+        - "CA03-01"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-2"
+        - "CA-3 (parcial)"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Contact"
+              "example":
+                "id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+                "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "patientName": "Paciente de prueba A"
+                "managerId": "11111111-1111-4111-8111-111111111111"
+                "managerName": "Gestor A"
+                "cityId": 1
+                "cityName": "Bogotá"
+                "occurredAt": "2026-09-10T15:00:00Z"
+                "channel": "LLAMADA"
+                "result": "SIN_RESPUESTA"
+                "revision": 1
+                "version": "AAAAAAAAAAE="
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "description": "UUID del recurso; mal formado: 400."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+  "/api/v1/contacts/{id}/corrections":
+    "post":
+      "operationId": "correctContact"
+      "summary": "Corregir contacto con historial"
+      "description": "Solo gestor ejecutor. Coordinadora con recurso visible: 403. Otro gestor: 404. Tras validar estructura y visibilidad, comparar versión antes de comprobar si existen cambios. Actualizar revisión vigente y añadir historial en una transacción; revertir todo si hay conflicto. El token devuelto cambia."
+      "tags":
+        - "Contactos"
+      "x-acceptance-scenarios":
+        - "CA03-01"
+        - "CA03-02"
+        - "CA03-03"
+        - "CA03-04"
+        - "SEC-02"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-3 (parcial)"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Contact"
+              "example":
+                "id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+                "patientId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+                "patientName": "Paciente de prueba A"
+                "managerId": "11111111-1111-4111-8111-111111111111"
+                "managerName": "Gestor A"
+                "cityId": 1
+                "cityName": "Bogotá"
+                "occurredAt": "2026-09-10T15:00:00Z"
+                "channel": "LLAMADA"
+                "result": "CONTACTADO"
+                "revision": 2
+                "version": "AAAAAAAAAAI="
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+        "415":
+          "$ref": "#/components/responses/UnsupportedMediaType"
+        "409":
+          "description": "El contacto cambió; recargue la versión vigente antes de corregirlo."
+          "content":
+            "application/problem+json":
+              "schema":
+                "$ref": "#/components/schemas/Problem"
+              "example":
+                "type": "about:blank"
+                "title": "El contacto cambió; recargue la versión vigente antes de corregirlo."
+                "status": 409
+                "code": "CONTACT_VERSION_CONFLICT"
+                "traceId": "demo-trace-0001"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "description": "UUID del recurso; mal formado: 400."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CorrectContactRequest"
+            "example":
+              "occurredAt": "2026-09-10T15:00:00Z"
+              "channel": "LLAMADA"
+              "result": "CONTACTADO"
+              "reason": "Se verificó el resultado de la llamada."
+              "expectedVersion": "AAAAAAAAAAE="
+  "/api/v1/contacts/{id}/history":
+    "get":
+      "operationId": "getContactHistory"
+      "summary": "Consultar historial de contacto"
+      "description": "Todas las revisiones en orden ascendente. Gestor ejecutor o coordinadora. recordedAt es fecha de captura, occurredAt es fecha efectiva."
+      "tags":
+        - "Contactos"
+      "x-acceptance-scenarios":
+        - "CA03-01"
+        - "CA03-02"
+        - "SEC-03"
+      "x-acceptance-criteria":
+        - "CA-3 (parcial)"
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/ContactRevision"
+              "example":
+                -
+                  "contactId": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+                  "revision": 1
+                  "occurredAt": "2026-09-10T15:00:00Z"
+                  "channel": "LLAMADA"
+                  "result": "SIN_RESPUESTA"
+                  "reason": null
+                  "recordedAt": "2026-09-24T15:00:00Z"
+                  "recordedBy": "11111111-1111-4111-8111-111111111111"
+                  "recordedByName": "Gestor A"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "description": "UUID del recurso; mal formado: 400."
+          "schema":
+            "type": "string"
+            "format": "uuid"
+  "/health/live":
+    "get":
+      "operationId": "getLiveHealth"
+      "summary": "Comprobar live"
+      "description": "El proceso HTTP puede responder."
+      "tags":
+        - "Salud"
+      "x-acceptance-scenarios":
+        - "OPS-01"
+      "x-acceptance-criteria": []
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Health"
+              "example":
+                "status": "healthy"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "security": []
+    "servers":
+      -
+        "url": "http://api:8080"
+        "description": "Red interna Docker; no resoluble desde el navegador del host."
+  "/health/ready":
+    "get":
+      "operationId": "getReadyHealth"
+      "summary": "Comprobar ready"
+      "description": "Conexión SQL y versión requerida de esquema disponibles. No revela detalles de infraestructura."
+      "tags":
+        - "Salud"
+      "x-acceptance-scenarios":
+        - "OPS-01"
+      "x-acceptance-criteria": []
+      "responses":
+        "200":
+          "description": "Operación satisfactoria."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Health"
+              "example":
+                "status": "healthy"
+        "503":
+          "$ref": "#/components/responses/Unavailable"
+        "500":
+          "$ref": "#/components/responses/InternalError"
+      "security": []
+    "servers":
+      -
+        "url": "http://api:8080"
+        "description": "Red interna Docker; no resoluble desde el navegador del host."
+"components":
+  "securitySchemes":
+    "DemoActor":
+      "type": "apiKey"
+      "in": "header"
+      "name": "X-Demo-Actor-Id"
+      "description": "UUID de actor precargado. Ausente, UUID inválido, desconocido o modo demo deshabilitado: 401. Los permisos se verifican en servidor. Health es anónimo."
+  "schemas":
+    "CreatePatientRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "fullName"
+        - "documentCountryCode"
+        - "documentTypeCode"
+        - "documentNumber"
+        - "phone"
+        - "cityId"
+        - "treatmentStartDate"
+      "properties":
+        "fullName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 150
+          "description": "Trim; no puede quedar vacío."
+        "documentCountryCode":
+          "type": "string"
+          "enum":
+            - "CO"
+            - "PE"
+            - "EC"
+        "documentTypeCode":
+          "type": "string"
+          "enum":
+            - "NATIONAL_ID"
+            - "FOREIGN_ID"
+            - "PASSPORT"
+        "documentNumber":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 40
+          "description": "Trim y mayúsculas invariantes para unicidad. Conservar ceros y puntuación interna."
+        "phone":
+          "type": "string"
+          "minLength": 7
+          "maxLength": 30
+          "pattern": "^(?=(?:[^0-9]*[0-9]){7})[0-9 +()\\-]+$"
+          "description": "Tras trim, al menos siete dígitos y solo los caracteres indicados."
+        "email":
+          "type": "string"
+          "nullable": true
+          "maxLength": 254
+          "description": "Opcional: omitido, null, vacío o solo espacios se normalizan a null. Si tiene contenido, trim y sintaxis de correo válida."
+        "cityId":
+          "type": "integer"
+          "minimum": 1
+        "treatmentStartDate":
+          "type": "string"
+          "format": "date"
+      "description": "Solo gestor. Inicio de tratamiento no posterior al día actual en Bogotá. Sin actor ni gestor en el cuerpo. Campos no reconocidos se rechazan con 400."
+    "Patient":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "id"
+        - "fullName"
+        - "documentCountryCode"
+        - "documentTypeCode"
+        - "documentNumber"
+        - "phone"
+        - "email"
+        - "cityId"
+        - "treatmentStartDate"
+        - "cityName"
+        - "assignedManagerId"
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "fullName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 150
+          "description": "Trim; no puede quedar vacío."
+        "documentCountryCode":
+          "type": "string"
+          "enum":
+            - "CO"
+            - "PE"
+            - "EC"
+        "documentTypeCode":
+          "type": "string"
+          "enum":
+            - "NATIONAL_ID"
+            - "FOREIGN_ID"
+            - "PASSPORT"
+        "documentNumber":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 40
+          "description": "Trim y mayúsculas invariantes para unicidad. Conservar ceros y puntuación interna."
+        "phone":
+          "type": "string"
+          "minLength": 7
+          "maxLength": 30
+          "pattern": "^(?=(?:[^0-9]*[0-9]){7})[0-9 +()\\-]+$"
+          "description": "Tras trim, al menos siete dígitos y solo los caracteres indicados."
+        "email":
+          "type": "string"
+          "nullable": true
+          "maxLength": 254
+          "description": "Opcional: omitido, null, vacío o solo espacios se normalizan a null. Si tiene contenido, trim y sintaxis de correo válida."
+        "cityId":
+          "type": "integer"
+          "minimum": 1
+        "treatmentStartDate":
+          "type": "string"
+          "format": "date"
+        "cityName":
+          "type": "string"
+        "assignedManagerId":
+          "type": "string"
+          "format": "uuid"
+    "CreateFollowUpRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "patientId"
+        - "scheduledAt"
+      "properties":
+        "patientId":
+          "type": "string"
+          "format": "uuid"
+        "scheduledAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+      "description": "Paciente asignado al actor. scheduledAt estrictamente posterior a IClock.UtcNow. No demuestra adherencia clínica."
+    "FollowUp":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "id"
+        - "patientId"
+        - "managerId"
+        - "scheduledAt"
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "patientId":
+          "type": "string"
+          "format": "uuid"
+        "managerId":
+          "type": "string"
+          "format": "uuid"
+        "scheduledAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+    "CreateContactRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "patientId"
+        - "occurredAt"
+        - "channel"
+        - "result"
+      "properties":
+        "patientId":
+          "type": "string"
+          "format": "uuid"
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+        "channel":
+          "type": "string"
+          "enum":
+            - "LLAMADA"
+            - "WHATSAPP"
+            - "CORREO"
+        "result":
+          "type": "string"
+          "enum":
+            - "CONTACTADO"
+            - "SIN_RESPUESTA"
+            - "FALLIDO"
+      "description": "occurredAt no posterior a IClock.UtcNow. Se permite anterior al inicio del tratamiento. Los tres resultados se admiten en los tres canales."
+    "CorrectContactRequest":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "occurredAt"
+        - "channel"
+        - "result"
+        - "reason"
+        - "expectedVersion"
+      "properties":
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+        "channel":
+          "type": "string"
+          "enum":
+            - "LLAMADA"
+            - "WHATSAPP"
+            - "CORREO"
+        "result":
+          "type": "string"
+          "enum":
+            - "CONTACTADO"
+            - "SIN_RESPUESTA"
+            - "FALLIDO"
+        "reason":
+          "type": "string"
+          "minLength": 10
+          "maxLength": 500
+          "description": "Longitud después de trim."
+        "expectedVersion":
+          "type": "string"
+          "format": "byte"
+          "minLength": 12
+          "maxLength": 12
+          "pattern": "^[A-Za-z0-9+/]{10}[AEIMQUYcgkosw048]=$"
+          "description": "Base64 canónico de ocho bytes de rowversion. Token opaco, no contador ni fecha."
+      "description": "Debe cambiar fecha efectiva, canal o resultado; cambiar únicamente motivo no basta. Paciente, gestor y ciudad no son editables. Una versión obsoleta válida produce 409."
+    "Contact":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "id"
+        - "patientId"
+        - "patientName"
+        - "managerId"
+        - "managerName"
+        - "cityId"
+        - "cityName"
+        - "occurredAt"
+        - "channel"
+        - "result"
+        - "revision"
+        - "version"
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "patientId":
+          "type": "string"
+          "format": "uuid"
+        "patientName":
+          "type": "string"
+        "managerId":
+          "type": "string"
+          "format": "uuid"
+        "managerName":
+          "type": "string"
+        "cityId":
+          "type": "integer"
+          "minimum": 1
+        "cityName":
+          "type": "string"
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+        "channel":
+          "type": "string"
+          "enum":
+            - "LLAMADA"
+            - "WHATSAPP"
+            - "CORREO"
+        "result":
+          "type": "string"
+          "enum":
+            - "CONTACTADO"
+            - "SIN_RESPUESTA"
+            - "FALLIDO"
+        "revision":
+          "type": "integer"
+          "minimum": 1
+        "version":
+          "type": "string"
+          "format": "byte"
+          "minLength": 12
+          "maxLength": 12
+          "pattern": "^[A-Za-z0-9+/]{10}[AEIMQUYcgkosw048]=$"
+          "description": "Base64 canónico de ocho bytes de rowversion. Token opaco, no contador ni fecha."
+    "ContactRevision":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "contactId"
+        - "revision"
+        - "occurredAt"
+        - "channel"
+        - "result"
+        - "reason"
+        - "recordedAt"
+        - "recordedBy"
+        - "recordedByName"
+      "properties":
+        "contactId":
+          "type": "string"
+          "format": "uuid"
+        "revision":
+          "type": "integer"
+          "minimum": 1
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+        "channel":
+          "type": "string"
+          "enum":
+            - "LLAMADA"
+            - "WHATSAPP"
+            - "CORREO"
+        "result":
+          "type": "string"
+          "enum":
+            - "CONTACTADO"
+            - "SIN_RESPUESTA"
+            - "FALLIDO"
+        "reason":
+          "type": "string"
+          "nullable": true
+          "maxLength": 500
+          "description": "null en revisión 1; obligatorio entre 10 y 500 caracteres en correcciones."
+        "recordedAt":
+          "type": "string"
+          "format": "date-time"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+          "description": "Instante con offset obligatorio y hasta tres decimales; respuesta normalizada a UTC con Z. Comparaciones contra IClock en milisegundos."
+        "recordedBy":
+          "type": "string"
+          "format": "uuid"
+        "recordedByName":
+          "type": "string"
+    "PatientPage":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "items"
+        - "total"
+        - "page"
+        - "pageSize"
+      "properties":
+        "items":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/Patient"
+        "total":
+          "type": "integer"
+          "minimum": 0
+        "page":
+          "type": "integer"
+          "minimum": 1
+        "pageSize":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 100
+    "ContactPage":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "items"
+        - "total"
+        - "page"
+        - "pageSize"
+        - "month"
+        - "timeZone"
+      "properties":
+        "items":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/Contact"
+        "total":
+          "type": "integer"
+          "minimum": 0
+        "page":
+          "type": "integer"
+          "minimum": 1
+        "pageSize":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 100
+        "month":
+          "type": "string"
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+          "description": "Mes civil de America/Bogota; años admitidos 0001 a 9998 para poder calcular el inicio del mes siguiente."
+        "timeZone":
+          "type": "string"
+          "enum":
+            - "America/Bogota"
+    "Country":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "name"
+      "properties":
+        "code":
+          "type": "string"
+          "enum":
+            - "CO"
+            - "PE"
+            - "EC"
+        "name":
+          "type": "string"
+    "City":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "id"
+        - "countryCode"
+        - "name"
+      "properties":
+        "id":
+          "type": "integer"
+          "minimum": 1
+        "countryCode":
+          "type": "string"
+          "enum":
+            - "CO"
+            - "PE"
+            - "EC"
+        "name":
+          "type": "string"
+    "DocumentType":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "name"
+      "properties":
+        "code":
+          "type": "string"
+          "enum":
+            - "NATIONAL_ID"
+            - "FOREIGN_ID"
+            - "PASSPORT"
+        "name":
+          "type": "string"
+    "ChannelOption":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "name"
+      "properties":
+        "code":
+          "type": "string"
+          "enum":
+            - "LLAMADA"
+            - "WHATSAPP"
+            - "CORREO"
+        "name":
+          "type": "string"
+    "ResultOption":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "code"
+        - "name"
+      "properties":
+        "code":
+          "type": "string"
+          "enum":
+            - "CONTACTADO"
+            - "SIN_RESPUESTA"
+            - "FALLIDO"
+        "name":
+          "type": "string"
+    "Manager":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "id"
+        - "displayName"
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "displayName":
+          "type": "string"
+    "Catalogs":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "countries"
+        - "cities"
+        - "documentTypes"
+        - "channels"
+        - "results"
+        - "managers"
+      "properties":
+        "countries":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/Country"
+        "cities":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/City"
+        "documentTypes":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/DocumentType"
+        "channels":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/ChannelOption"
+        "results":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/ResultOption"
+        "managers":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/Manager"
+    "Problem":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "type"
+        - "title"
+        - "status"
+        - "code"
+        - "traceId"
+      "properties":
+        "type":
+          "type": "string"
+          "format": "uri"
+          "example": "about:blank"
+        "title":
+          "type": "string"
+        "status":
+          "type": "integer"
+          "minimum": 400
+          "maximum": 599
+        "code":
+          "type": "string"
+          "enum":
+            - "VALIDATION_ERROR"
+            - "DEMO_ACTOR_REQUIRED"
+            - "FORBIDDEN"
+            - "RESOURCE_NOT_FOUND"
+            - "PATIENT_ALREADY_EXISTS"
+            - "CONTACT_VERSION_CONFLICT"
+            - "NO_CHANGES"
+            - "INTERNAL_ERROR"
+            - "DEPENDENCY_UNAVAILABLE"
+            - "UNSUPPORTED_MEDIA_TYPE"
+        "traceId":
+          "type": "string"
+          "minLength": 1
+        "errors":
+          "type": "object"
+          "additionalProperties":
+            "type": "array"
+            "items":
+              "type": "string"
+          "description": "Claves camelCase del campo; $ para JSON/cuerpo inválido. No incluir valores sensibles."
+    "Health":
+      "type": "object"
+      "additionalProperties": false
+      "required":
+        - "status"
+      "properties":
+        "status":
+          "type": "string"
+          "enum":
+            - "healthy"
+  "responses":
+    "BadRequest":
+      "description": "JSON/campos/filtros inválidos: VALIDATION_ERROR. Corrección sin cambios: NO_CHANGES. errors es obligatorio para VALIDATION_ERROR."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "examples":
+            "futureContact":
+              "value":
+                "type": "about:blank"
+                "title": "La solicitud contiene datos inválidos."
+                "status": 400
+                "code": "VALIDATION_ERROR"
+                "traceId": "demo-trace-0001"
+                "errors":
+                  "occurredAt":
+                    - "La fecha del contacto no puede estar en el futuro."
+            "invalidField":
+              "value":
+                "type": "about:blank"
+                "title": "La solicitud contiene datos inválidos."
+                "status": 400
+                "code": "VALIDATION_ERROR"
+                "traceId": "demo-trace-0001"
+                "errors":
+                  "$":
+                    - "El cuerpo o sus campos no son válidos."
+            "noChanges":
+              "value":
+                "type": "about:blank"
+                "title": "La corrección no modifica los datos del contacto."
+                "status": 400
+                "code": "NO_CHANGES"
+                "traceId": "demo-trace-0001"
+    "Unauthorized":
+      "description": "Se requiere un actor de demostración válido."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "Se requiere un actor de demostración válido."
+            "status": 401
+            "code": "DEMO_ACTOR_REQUIRED"
+            "traceId": "demo-trace-0001"
+      "headers":
+        "WWW-Authenticate":
+          "schema":
+            "type": "string"
+          "description": "Desafío local informativo; no representa autenticación productiva."
+          "example": "DemoActor realm=\"local-demo\""
+    "Forbidden":
+      "description": "El actor no tiene permiso para esta acción."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "El actor no tiene permiso para esta acción."
+            "status": 403
+            "code": "FORBIDDEN"
+            "traceId": "demo-trace-0001"
+    "NotFound":
+      "description": "No se encontró el recurso solicitado."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "No se encontró el recurso solicitado."
+            "status": 404
+            "code": "RESOURCE_NOT_FOUND"
+            "traceId": "demo-trace-0001"
+    "InternalError":
+      "description": "No fue posible completar la operación."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "No fue posible completar la operación."
+            "status": 500
+            "code": "INTERNAL_ERROR"
+            "traceId": "demo-trace-0001"
+    "Unavailable":
+      "description": "El servicio no está listo."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "El servicio no está listo."
+            "status": 503
+            "code": "DEPENDENCY_UNAVAILABLE"
+            "traceId": "demo-trace-0001"
+    "UnsupportedMediaType":
+      "description": "El cuerpo debe utilizar application/json."
+      "content":
+        "application/problem+json":
+          "schema":
+            "$ref": "#/components/schemas/Problem"
+          "example":
+            "type": "about:blank"
+            "title": "El cuerpo debe utilizar application/json."
+            "status": 415
+            "code": "UNSUPPORTED_MEDIA_TYPE"
+            "traceId": "demo-trace-0001"
