@@ -1,0 +1,9 @@
+services:
+  db:
+    ports: !reset []
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Test
+    ports: !reset []
+  web:
+    ports: !reset []

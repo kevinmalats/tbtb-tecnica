@@ -1,0 +1,11 @@
+bin/
+obj/
+node_modules/
+dist/
+.angular/
+.env
+.vs/
+.vscode/
+TestResults/
+playwright-report/
+api/.nuget/

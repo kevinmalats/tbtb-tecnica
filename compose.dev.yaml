@@ -1,0 +1,28 @@
+services:
+  api:
+    build:
+      target: build
+    command: dotnet watch --project api/src/Tbtb.Api/Tbtb.Api.csproj run --urls http://0.0.0.0:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    healthcheck:
+      disable: true
+    volumes:
+      - .:/src
+    working_dir: /src
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: build
+    command: npm start -- --poll 1000
+    working_dir: /app
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+    healthcheck:
+      disable: true
+
+volumes:
+  web-node-modules:

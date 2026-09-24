@@ -1,0 +1,12 @@
+IF SUSER_ID(N'tbtb_app') IS NULL
+BEGIN
+    CREATE LOGIN tbtb_app
+        WITH PASSWORD = '$(AppDbPassword)', CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;
+END;
+
+IF USER_ID(N'tbtb_app') IS NULL
+BEGIN
+    CREATE USER tbtb_app FOR LOGIN tbtb_app;
+END;
+
+GRANT SELECT, INSERT, UPDATE ON SCHEMA::dbo TO tbtb_app;

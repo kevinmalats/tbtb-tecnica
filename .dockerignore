@@ -1,0 +1,13 @@
+.git
+.env
+.vs
+.vscode
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.angular
+TestResults
+playwright-report
+README.md
+03-bitacora.md
