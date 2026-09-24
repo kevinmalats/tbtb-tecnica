@@ -7,6 +7,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tbtb.Domain\Tbtb.Domain.csproj" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.19" />
   </ItemGroup>
 </Project>

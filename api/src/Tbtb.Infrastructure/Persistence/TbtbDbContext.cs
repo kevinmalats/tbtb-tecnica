@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Tbtb.Application.Abstractions;
 using Tbtb.Domain;
 
 namespace Tbtb.Infrastructure.Persistence;
 
-public sealed class TbtbDbContext(DbContextOptions<TbtbDbContext> options) : DbContext(options), ITbtbDbContext
+public sealed class TbtbDbContext(DbContextOptions<TbtbDbContext> options) : DbContext(options)
 {
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<City> Cities => Set<City>();
