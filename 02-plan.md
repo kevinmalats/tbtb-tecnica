@@ -224,7 +224,7 @@ Compose usará condiciones `service_healthy` y `service_completed_successfully` 
 5. Ejecutar el arnés de pruebas sobre un proyecto Compose aislado, con código de salida distinto de cero ante fallos.
 6. `docker compose down` detiene el entorno y conserva datos; documentar por separado el borrado deliberado del volumen, sin hacerlo parte del arranque normal.
 
-Los comandos son el contrato operativo que se implementará; aún no existen los Dockerfiles ni han sido ejecutados. Los puertos serán configurables para resolver colisiones. Las migraciones no se ejecutarán desde cada instancia de la API.
+Los comandos anteriores son el contrato operativo implementado y verificado. Los puertos son configurables para resolver colisiones y los scripts SQL se ejecutan en `db-init`, no desde cada instancia de la API.
 
 ### Esquema y semillas
 

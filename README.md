@@ -1,11 +1,11 @@
 # TBTB Contactos de pacientes
 
-Implementacion inicial de la prueba TBTB Global, basada en `02-plan.md`, `api-contract.yaml` y `acceptance-scenarios.md`.
+Implementacion de la prueba TBTB Global, basada en `02-plan.md`, `api-contract.yaml` y `acceptance-scenarios.md`.
 
 ## Estado actual
 
 - API ASP.NET Core `net8.0` con demo-auth por `X-Demo-Actor-Id`.
-- Endpoints iniciales de catalogos, pacientes, agenda, contactos, correcciones, historial y health.
+- Endpoints de catalogos, pacientes, agenda, contactos, correcciones, historial y health.
 - Persistencia real en SQL Server mediante EF Core 8; scripts SQL versionados como fuente de verdad del esquema.
 - Arquitectura backend separada en Domain, Application, Infrastructure y Api.
 - Angular 21 con Tailwind CSS 4: pacientes, agenda, contactos mensuales, filtros, detalle, historial y correcciones.
@@ -84,7 +84,11 @@ Suite unitaria y perfiles aislados de integracion/E2E:
 
 ```powershell
 dotnet test api/Tbtb.sln
+./tests/architecture-check.ps1
 docker compose -f compose.yaml -f compose.test.yaml down --volumes
+docker compose -f compose.yaml -f compose.test.yaml --profile test run --rm --build unit-web
 docker compose -f compose.yaml -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from tests tests
 docker compose -f compose.yaml -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from e2e e2e
 ```
+
+El `down --volumes` anterior afecta exclusivamente al proyecto Compose `tbtb-test` definido por el override; no elimina la base persistente del entorno de desarrollo. La suite determinista debe ejecutarse antes del E2E, porque este ultimo crea sus propios pacientes y contactos.

@@ -1,6 +1,12 @@
 name: tbtb-test
 
 services:
+  unit-web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile.unit
+    profiles: ["test"]
+
   db:
     ports: !reset []
   db-init:

@@ -213,3 +213,31 @@
 - La primera ejecucion E2E detecto que el nombre de paciente no era una accion accesible para abrir el detalle. Se corrigio con un boton semantico y se repitio el recorrido completo.
 - Compilacion Angular de produccion aprobada en Docker: bundle inicial 393.75 kB, 87.81 kB estimados transferidos.
 - Playwright 1.55 + Chromium aprobado nuevamente: 1 prueba, 1.9 s de recorrido y 2.7 s totales.
+
+## 2026-09-24 - Cierre de arquitectura y pruebas de fachada
+
+### Arquitectura backend
+
+- `Program.cs` quedo reducido a composicion DI, autenticacion demo, rutas y traduccion de `UseCaseResult` a HTTP; ya no consulta ni guarda entidades EF.
+- Incorporados `ITbtbUseCases` y `TbtbUseCases` en Application para materializar el flujo HTTP -> caso de uso -> puerto -> adaptador.
+- Divididos los puertos por necesidad en `IActorRepository`, `ICatalogRepository`, `IPatientRepository`, `IFollowUpRepository`, `IContactRepository`, `IMonthlyContactQuery` e `IHealthProbe`; no se introdujo un repositorio generico.
+- Agregado `SqlTbtbUseCases` en Infrastructure como adaptador de SQL Server/EF Core, incluyendo consulta mensual, autorizacion por actor, escrituras y concurrencia optimista.
+- Agregadas pruebas de referencias de ensamblados y `tests/architecture-check.ps1` para impedir acceso directo a persistencia desde API o dependencias HTTP desde presentacion Angular.
+
+### Arquitectura y pruebas Angular
+
+- Extraido `WorkspacePort` y los modelos de aplicacion; `ApiService` lo implementa y se enlaza mediante `WORKSPACE_PORT`/`InjectionToken` en la composicion.
+- `WorkspaceFacade` depende solo del puerto, sin importar `HttpClient` ni el adaptador concreto.
+- Habilitados el builder oficial `@angular/build:unit-test`, Vitest 4.0.8 y jsdom 27.0.0 en Node 22.14 dentro de Docker.
+- Aprobadas 2 pruebas unitarias de fachada con dobles del puerto, sin advertencias; agregado `tsconfig.spec.json` para comprobacion estricta de TypeScript.
+
+### Verificacion final de este bloque
+
+- `dotnet test api/Tbtb.sln --no-restore`: 14/14 pruebas aprobadas.
+- `tests/architecture-check.ps1`: fronteras de arquitectura aprobadas.
+- `tests/acceptance-smoke.ps1`: 11 comprobaciones HTTP aprobadas contra SQL Server real.
+- Volumen aislado `tbtb-test` recreado: suite C1-C8 aprobada con total exacto 6 y limites temporales correctos.
+- Playwright 1.55: 1/1 E2E aprobado despues del fixture limpio; ultima ejecucion 1.5 s de recorrido y 2.2 s totales.
+- Tras dividir los puertos backend se reconstruyo la imagen final, se recreo el stack de desarrollo y se repitieron las 11 comprobaciones smoke, el fixture C1-C8 y Playwright sin regresiones.
+- Contenedores de desarrollo `db`, `api` y `web` saludables; Swagger permanece en `http://localhost:8080/swagger` y Angular en `http://localhost:4201` para este entorno.
+- Riesgo de tooling actualizado: `npm audit` informa 24 vulnerabilidades transitivas (2 bajas, 9 moderadas, 12 altas y 1 critica). No se aplico `npm audit fix --force` por introducir cambios mayores no evaluados.
