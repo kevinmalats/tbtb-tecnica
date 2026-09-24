@@ -43,6 +43,7 @@ export class ApiService {
   setActor(id: string): void { this.actorId.set(id); }
   getCatalogs(): Promise<Catalogs> { return firstValueFrom(this.http.get<Catalogs>(`${this.baseUrl}/catalogs`, { headers: this.headers() })); }
   getPatients(): Promise<Page<Patient>> { return firstValueFrom(this.http.get<Page<Patient>>(`${this.baseUrl}/patients`, { headers: this.headers() })); }
+  getPatient(id: string): Promise<Patient> { return firstValueFrom(this.http.get<Patient>(`${this.baseUrl}/patients/${id}`, { headers: this.headers() })); }
   createPatient(value: CreatePatient): Promise<Patient> { return firstValueFrom(this.http.post<Patient>(`${this.baseUrl}/patients`, value, { headers: this.headers() })); }
   getContacts(month: string, managerId = '', cityId = 0): Promise<ContactPage> {
     let params = new HttpParams().set('month', month);

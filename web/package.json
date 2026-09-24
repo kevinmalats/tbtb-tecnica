@@ -5,7 +5,8 @@
   "scripts": {
     "start": "ng serve --host 0.0.0.0",
     "build": "ng build",
-    "test": "ng test"
+    "test": "ng test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@angular/common": "21.2.0",
@@ -20,9 +21,10 @@
     "zone.js": "0.15.1"
   },
   "devDependencies": {
-    "@angular/cli": "21.2.0",
     "@angular/build": "21.2.0",
+    "@angular/cli": "21.2.0",
     "@angular/compiler-cli": "21.2.0",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4.1.13",
     "tailwindcss": "^4.1.13",
     "typescript": "5.9.2"
