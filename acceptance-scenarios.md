@@ -2,7 +2,7 @@
 
 **Versión:** 0.1.0 · **Fecha:** 2026-09-24.  
 **Referencias:** `../01-hallazgos.md`, `../02-plan.md` y `api-contract.yaml`.  
-**Estado:** especificaciones previas al desarrollo. Todos los escenarios están pendientes de implementación y ejecución; no constituyen evidencia de pruebas aprobadas.
+**Estado:** especificaciones de aceptación. La evidencia ejecutada y su alcance se registra en `03-bitacora.md`; los escenarios no cubiertos por una suite no se consideran aprobados por inferencia.
 
 ## 1. Alcance y forma de uso
 
@@ -112,16 +112,16 @@ Verificación: integración de entorno. Health se consulta en la red Docker medi
 
 Verificación: Playwright + API + SQL Server del entorno de pruebas. Los dobles de HTTP sirven para pruebas unitarias de presentación, pero no prueban este recorrido completo.
 
-## 9. Trazabilidad prevista
+## 9. Trazabilidad y ejecucion
 
 | CA / objetivo | Escenarios | Hallazgos relacionados | Estado actual |
 | --- | --- | --- | --- |
-| CA-1 | CA01-01 a CA01-05 | H-08, H-09, H-12 | Especificado, no ejecutado. |
-| CA-2 | CA02-01 a CA02-04 | H-04, H-10, H-11, H-12 | Especificado, no ejecutado. |
-| CA-3 parcial | CA03-01 a CA03-04 | H-06, H-07, H-10 | Especificado, no ejecutado; cobertura parcial prevista. |
-| CA-4 | CA04-01 a CA04-05 | H-10, H-11, H-12 | Especificado, no ejecutado. |
-| Acceso/contrato | SEC-01 a SEC-04, CAT-01, HTTP-01 | H-08, H-12, H-13 | Especificado, no ejecutado. |
-| Operación/error | OPS-01, UI-01 | Requisitos transversales de la prueba | Especificado, no ejecutado. |
+| CA-1 | CA01-01 a CA01-05 | H-08, H-09, H-12 | Implementado; CA01-01 y duplicado CA01-02 automatizados. Los bordes restantes siguen especificados para ampliar la suite. |
+| CA-2 | CA02-01 a CA02-04 | H-04, H-10, H-11, H-12 | Implementado; alta/lectura y rechazo de fecha/codigos invalidos automatizados. |
+| CA-3 parcial | CA03-01 a CA03-04 | H-06, H-07, H-10 | Implementada la parte operativa; historial y conflicto concurrente automatizados en API y E2E. Sigue parcial por el reporte externo no definido. |
+| CA-4 | CA04-01 a CA04-05 | H-10, H-11, H-12 | Implementado; filtros combinados, filtro no autorizado y mes invalido automatizados. |
+| Acceso/contrato | SEC-01 a SEC-04, CAT-01, HTTP-01 | H-08, H-12, H-13 | Actor requerido, visibilidad, catálogos, campos desconocidos y tipo de contenido comprobados; ampliar parametrizaciones sigue siendo posible. |
+| Operación/error | OPS-01, UI-01 | Requisitos transversales de la prueba | Health, arranque aislado, persistencia tras reinicio y conflicto UI comprobados. |
 | CA-5 / CA-6 | Sin escenarios de implementación | H-02, H-03, H-05, H-14 | Fuera del alcance acordado. |
 
 ## 10. Precisiones introducidas al formalizar el contrato

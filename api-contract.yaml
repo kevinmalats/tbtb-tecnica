@@ -1,9 +1,9 @@
-# Contrato de diseño; todavía no implementado.
+# Contrato HTTP de la implementacion TBTB.
 "openapi": "3.0.3"
 "info":
   "title": "TBTB - Contactos de pacientes"
   "version": "0.1.0"
-  "description": "Contrato previo a implementación, derivado de 02-plan.md. CA-1, CA-2 y CA-4 previstos completos; CA-3 parcial; CA-5/CA-6 excluidos. No hay reporte de adherencia. Todos los ejemplos usan datos ficticios y reloj 2026-09-24T15:00:00Z. Fechas con offset y máximo tres decimales. Campos desconocidos en cuerpos se rechazan. Las reglas de negocio no expresables en JSON Schema se verifican en el servicio. Identity de demostración exclusiva del entorno local; no es autenticación productiva."
+  "description": "Contrato implementado a partir de 02-plan.md. CA-1, CA-2 y CA-4 cubiertos; CA-3 parcial; CA-5/CA-6 excluidos. No hay reporte de adherencia. Todos los ejemplos usan datos ficticios y reloj 2026-09-24T15:00:00Z. Fechas con offset y máximo tres decimales. Campos desconocidos en cuerpos se rechazan. Las reglas de negocio no expresables en JSON Schema se verifican en el servicio. Identidad de demostración exclusiva del entorno local; no es autenticación productiva."
 "externalDocs":
   "description": "Especificación OpenAPI utilizada"
   "url": "https://spec.openapis.org/oas/v3.0.3.html"
@@ -67,13 +67,13 @@
                 "documentTypes":
                   -
                     "code": "NATIONAL_ID"
-                    "name": "NATIONAL_ID"
+                    "name": "DNI"
                   -
                     "code": "FOREIGN_ID"
-                    "name": "FOREIGN_ID"
+                    "name": "Documento extranjero"
                   -
                     "code": "PASSPORT"
-                    "name": "PASSPORT"
+                    "name": "Pasaporte"
                 "channels":
                   -
                     "code": "LLAMADA"

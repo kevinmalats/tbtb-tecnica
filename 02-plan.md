@@ -3,7 +3,7 @@
 **Prueba:** TBTB Global, Desarrollador, versión 2.0, septiembre de 2026.  
 **Track:** Connect: C#, ASP.NET Core Web API sobre .NET 8, SQL Server y Angular.  
 **Entrada:** `01-hallazgos.md` y enunciado de la prueba, especialmente las partes II-IV y los anexos A y C.  
-**Estado:** plan previo al desarrollo; comportamiento definido bajo los supuestos que se detallan aquí. No representa funcionalidad implementada ni pruebas ejecutadas.  
+**Estado:** plan base de la implementacion. El avance y las evidencias ejecutadas se registran en `03-bitacora.md`; los limites CA-3 parcial y CA-5/CA-6 fuera de alcance se conservan.  
 **Entorno:** desarrollo y demostración local con Docker Compose.
 
 ## 1. Objetivo y alcance cerrado
@@ -336,4 +336,3 @@ Si el tiempo disponible no alcanza, se modificará explícitamente este plan ant
 | Datos retroactivos de ciudad | Paciente se mudó antes del contacto registrado. | Supuesto visible de ciudad estable para la demo; no afirmar reconstrucción histórica fuera de ese supuesto. |
 | Modo de identidad local mal interpretado | Selector de actor presentado como inicio de sesión real. | Etiquetado visible, activación exclusiva local y documentación del límite. |
 | Diferencia entre contrato y código | UI espera campos/errores distintos a los que responde la API. | Contrato versionado y pruebas de integración que comprueben DTO y estados HTTP. |
-

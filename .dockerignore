@@ -5,6 +5,10 @@
 **/bin
 **/obj
 **/node_modules
+web/node_modules
+api/.nuget
+api/**/bin
+api/**/obj
 **/dist
 **/.angular
 TestResults

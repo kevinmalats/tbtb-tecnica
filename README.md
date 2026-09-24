@@ -6,14 +6,17 @@ Implementacion inicial de la prueba TBTB Global, basada en `02-plan.md`, `api-co
 
 - API ASP.NET Core `net8.0` con demo-auth por `X-Demo-Actor-Id`.
 - Endpoints iniciales de catalogos, pacientes, agenda, contactos, correcciones, historial y health.
-- Almacenamiento en memoria para habilitar el primer flujo ejecutable mientras se integra SQL Server/EF Core.
-- Scripts SQL iniciales para esquema, indices, permisos y seed de catalogos/actores.
-- Esqueleto Angular por funcionalidades, sin instalacion verificada porque el entorno local tiene Node 22.4.1 y `npm` falla por permisos del perfil.
+- Persistencia real en SQL Server mediante EF Core 8; scripts SQL versionados como fuente de verdad del esquema.
+- Arquitectura backend separada en Domain, Application, Infrastructure y Api.
+- Angular 21 con Tailwind CSS 4: pacientes, agenda, contactos mensuales, filtros, detalle, historial y correcciones.
+- Swagger interactivo, healthchecks y despliegue reproducible con Docker Compose.
 
 ## Verificacion local
 
 ```powershell
 dotnet build api/Tbtb.sln
+dotnet test api/Tbtb.sln
+$env:ConnectionStrings__Tbtb = "Server=127.0.0.1,1433;Database=Tbtb;User Id=tbtb_app;Password=$env:APP_DB_PASSWORD;Encrypt=True;TrustServerCertificate=True"
 dotnet run --project api/src/Tbtb.Api/Tbtb.Api.csproj
 ```
 
@@ -37,6 +40,8 @@ La API queda disponible en `http://localhost:8080` y SQL Server en
 `localhost:1433`, salvo que se cambien `TBTB_API_PORT` o `TBTB_DB_PORT`.
 El servicio efimero `db-init` crea la base `Tbtb` y aplica, en orden, los
 scripts de esquema, indices, permisos y datos demo.
+Cada script aplicado queda registrado con SHA-256 en `dbo.SchemaVersion`; el
+arranque falla si se modifica un script ya registrado.
 
 Swagger UI queda disponible en `http://localhost:8080/swagger`. Para probar
 las rutas `/api/v1`, usar `Authorize` e ingresar uno de los UUID demo, por
@@ -64,9 +69,22 @@ Para eliminar tambien el volumen de datos:
 docker compose down --volumes
 ```
 
-## Pendiente inmediato
+## Prueba de aceptacion automatizada
 
-- Reemplazar el store en memoria por infraestructura SQL Server/EF Core o ADO.NET sobre los scripts.
-- Agregar pruebas unitarias e integracion contra SQL Server real.
-- Completar Angular cuando Node/npm esten alineados con la version requerida.
-- Incorporar el frontend compilado al stack cuando la aplicacion Angular este completa.
+Con el stack levantado, ejecutar contra la API y SQL Server reales:
+
+```powershell
+./tests/acceptance-smoke.ps1
+```
+
+La prueba cubre alta y consulta de paciente, agenda, contacto, filtros combinados,
+correccion con historial y conflicto de concurrencia.
+
+Suite unitaria y perfiles aislados de integracion/E2E:
+
+```powershell
+dotnet test api/Tbtb.sln
+docker compose -f compose.yaml -f compose.test.yaml down --volumes
+docker compose -f compose.yaml -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from tests tests
+docker compose -f compose.yaml -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from e2e e2e
+```

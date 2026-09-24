@@ -154,3 +154,62 @@
 
 - Reconstruir Compose y ejecutar pruebas HTTP de persistencia y autorizacion.
 - Incorporar pruebas automatizadas de backend y completar agenda, detalle, filtros, correcciones e historial en Angular.
+
+## 2026-09-24 - Cierre funcional, pruebas y operacion reproducible
+
+### Backend y contrato
+
+- Eliminado el almacenamiento en memoria: todos los casos escriben y consultan SQL Server mediante EF Core 8.
+- Separados `Domain`, `Application`, `Infrastructure` y `Api`; `Domain` no depende de frameworks y `Application` ya no referencia EF Core.
+- Movidas a Application las reglas puras de canales, resultados, instantes ISO con offset y tokens `rowversion`.
+- Endurecidas las validaciones de paciente, agenda, contacto, correccion, paginacion, mes, gestor y ciudad.
+- Rechazados campos JSON desconocidos; agregados errores `application/problem+json`, conflicto por identidad concurrente y `409 CONTACT_VERSION_CONFLICT`.
+- `/health/ready` comprueba conexion y esquema utilizable; el modo de actor demo queda deshabilitado por defecto y Compose lo habilita explicitamente para la demo local.
+- Swagger conserva el esquema `DemoActor` y lo aplica a las operaciones documentadas.
+
+### Frontend Angular
+
+- Implementada agenda manual con seleccion de paciente, fecha futura, alta y consulta de seguimientos.
+- Agregados filtros simultaneos de contactos por mes, gestor y ciudad.
+- Agregados detalle, historial de revisiones y formulario de correccion con motivo y version esperada.
+- Agregadas rutas Angular reales para `/patients`, `/patients/new`, `/agenda`, `/contacts` y `/contacts/:id`.
+- Agregado detalle navegable `/patients/:id`, recuperable tras recargar la pagina, con identidad, datos de contacto y accesos a agenda/contacto.
+- El conflicto conserva los valores, muestra una accion `Recargar contacto` y no reintenta una escritura automaticamente.
+- Sustituida la tasa porcentual no definida por un conteo factual de contactos efectivos, respetando la exclusion de CA-6.
+- El resumen obtiene el conteo real de seguimientos futuros en vez de mostrar un valor fijo.
+- Compilacion Angular de produccion verificada en Docker: bundle inicial 387.14 kB, 86.54 kB estimados transferidos.
+
+### Automatizacion y evidencias
+
+- `dotnet build api/Tbtb.sln --no-restore`: 0 advertencias, 0 errores.
+- `dotnet test api/Tbtb.sln --no-restore`: 12 pruebas xUnit aprobadas sobre reglas de CA-2/CA-3.
+- `tests/acceptance-smoke.ps1`: aprobados CAT-01, CA01-01, CA02-01, CA04-03, CA03-01 y CA03-02 contra API y SQL Server reales.
+- Perfil aislado `tbtb-test`: arnes Compose aprobado con health, esquema, catalogos, aislamiento por gestor y error contractual de mes invalido.
+- Agregado `seed-test.sql` con fixture determinista C1-C8; desde volumen limpio se comprobaron total 6 para septiembre, limites inclusivo/exclusivo y ausencia de C5/C6.
+- Playwright 1.55 + Chromium: 1 E2E aprobado y repetible, creando datos unicos por API y verificando agenda, contactos, detalle, historial, conflicto real entre dos clientes, conservacion del formulario y accion de recarga.
+- Revision visual adicional en navegador: agenda y modal responsivos, sin solapamientos en viewport estrecho.
+- Reinicio de la API verificado sin perdida de pacientes; `api`, `db` y `web` saludables despues del reinicio.
+
+### Base de datos y seguridad local
+
+- `dbo.SchemaVersion` registra SHA-256 de cada script; el inicializador omite versiones ya aplicadas y falla ante cambios de checksum.
+- Agregado `004-demo-contacts.sql`: la demo recibe contactos ficticios del mes de referencia y del anterior; el perfil de pruebas lo sustituye por su fixture fijo.
+- Validado reinicio idempotente: los cuatro scripts fueron reconocidos como ya aplicados.
+- El usuario `tbtb_app` conserva lectura/insercion/actualizacion necesarias, con `DENY UPDATE, DELETE` sobre `ContactRevision`.
+- Retirada la contraseña local de `appsettings.json`; las credenciales se suministran por variables de entorno ignoradas por Git.
+- Agregados `global.json` y reloj `IClock` inyectable; la imagen de compilacion conserva SDK .NET 8.0.415 y el host puede avanzar a un SDK compatible instalado.
+
+### Cobertura declarada
+
+- CA-1, CA-2 y CA-4: recorridos principales implementados y automatizados.
+- CA-3: cubierta la correccion operativa, historial y concurrencia; permanece parcial respecto al reporte externo no definido.
+- CA-5 y CA-6: continúan fuera de alcance según el plan; no se fabricaron reglas clinicas ni porcentajes de adherencia.
+- Riesgo restante conocido: `npm audit` informa 22 vulnerabilidades transitivas (2 bajas, 8 moderadas y 12 altas) en tooling Angular/Playwright; no se aplico `--force` porque implicaria cambios mayores no revisados.
+
+## 2026-09-24 - Formularios reactivos y regresion E2E
+
+- Migrados los formularios de paciente, seguimiento, contacto y correccion desde `NgForm`/`ngModel` a formularios reactivos tipados de Angular.
+- Incorporados validadores de longitud, correo, campos obligatorios, ciudad y motivo de correccion en la capa de presentacion; el backend continua como autoridad final.
+- La primera ejecucion E2E detecto que el nombre de paciente no era una accion accesible para abrir el detalle. Se corrigio con un boton semantico y se repitio el recorrido completo.
+- Compilacion Angular de produccion aprobada en Docker: bundle inicial 393.75 kB, 87.81 kB estimados transferidos.
+- Playwright 1.55 + Chromium aprobado nuevamente: 1 prueba, 1.9 s de recorrido y 2.7 s totales.
