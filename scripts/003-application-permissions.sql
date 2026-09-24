@@ -10,3 +10,4 @@ BEGIN
 END;
 
 GRANT SELECT, INSERT, UPDATE ON SCHEMA::dbo TO tbtb_app;
+DENY UPDATE, DELETE ON dbo.ContactRevision TO tbtb_app;
